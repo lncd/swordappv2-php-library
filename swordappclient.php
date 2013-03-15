@@ -142,6 +142,12 @@ class SWORDAPPClient {
                                                "POST", $sac_fname, $sac_inprogress);
     }
 
+    // Function to create a resource by depositing an Atom entry
+    function depositAtomEntryString($sac_url, $sac_u, $sac_p, $sac_obo, $sac_string, $sac_inprogress = false) {
+        return $this->depositAtomEntryStringByMethod($sac_url, $sac_u, $sac_p, $sac_obo,
+                                               "POST", $sac_string, $sac_inprogress);
+    }
+    
     // Complete an incomplete deposit by posting the In-Progress header of false to an SE-IRI
     function completeIncompleteDeposit($sac_url, $sac_u, $sac_p, $sac_obo) {
         // Perform the deposit
@@ -661,6 +667,87 @@ class SWORDAPPClient {
         return $sac_dresponse;
     }
 
+    // Function to deposit an Atom entry
+    private function depositAtomEntryStringByMethod($sac_url, $sac_u, $sac_p, $sac_obo,
+                                              $sac_method, $sac_string, $sac_inprogress = false) {
+        // Perform the deposit
+        $sac_curl = $this->curl_init($sac_url, $sac_u, $sac_p);
+
+        $headers = array();
+        global $sal_useragent;
+        array_push($headers, $sal_useragent);
+        if (!empty($sac_obo)) {
+            array_push($headers, "On-Behalf-Of: " . $sac_obo);
+        }
+        array_push($headers, "Content-Type: application/atom+xml;type=entry");
+        if ($sac_inprogress) {
+            array_push($headers, "In-Progress: true");
+        } else {
+            array_push($headers, "In-Progress: false");
+        }
+
+		
+		/** use a max of 256KB of RAM before going to disk */
+		$fp = fopen('php://temp/maxmemory:256000', 'w');
+		if (!$fp) {
+		    die('could not open temp memory data');
+		}
+		fwrite($fp, $sac_string);
+		fseek($fp, 0); 
+
+        // Set the appropriate method
+        if ($sac_method == "PUT") {
+            curl_setopt($sac_curl, CURLOPT_PUT, true);
+            curl_setopt($sac_curl, CURLOPT_INFILE, $fp);
+            curl_setopt($sac_curl, CURLOPT_INFILESIZE, strlen($sac_string));
+        } else {
+            curl_setopt($sac_curl, CURLOPT_POST, true);
+            curl_setopt($sac_curl, CURLOPT_POSTFIELDS, $sac_string);
+            array_push($headers, "Content-Length: " . strlen($sac_string));
+        }
+
+        curl_setopt($sac_curl, CURLOPT_HTTPHEADER, $headers);
+
+        $sac_resp = curl_exec($sac_curl);
+        $sac_status = curl_getinfo($sac_curl, CURLINFO_HTTP_CODE);
+        curl_close($sac_curl);
+
+        // Parse the result
+        $sac_dresponse = new SWORDAPPEntry($sac_status, $sac_resp);
+
+        // Was it a successful result?
+        if (($sac_status >= 200) || ($sac_status < 300)) {
+            try {
+                // Get the deposit results
+                $sac_xml = @new SimpleXMLElement($sac_resp);
+                $sac_ns = $sac_xml->getNamespaces(true);
+
+                // Build the deposit response object
+                $sac_dresponse->buildhierarchy($sac_xml, $sac_ns);
+            } catch (Exception $e) {
+                throw new Exception("Error parsing response entry (" . $e->getMessage() . ")");
+            }
+        } else {
+            try {
+                // Parse the result
+                $sac_dresponse = new SWORDAPPErrorDocument($sac_status, $sac_resp);
+
+                // Get the deposit results
+                $sac_xml = @new SimpleXMLElement($sac_resp);
+                $sac_ns = $sac_xml->getNamespaces(true);
+
+                // Build the deposit response object
+                $sac_dresponse->buildhierarchy($sac_xml, $sac_ns);
+            } catch (Exception $e) {
+                throw new Exception("Error parsing error document (" . $e->getMessage() . ")");
+            }
+        }
+
+        // Return the deposit object
+        return $sac_dresponse;
+    }
+    
+    
     // Request a URI with the specified credentials, and on-behalf-of the specified user.
     // This is not specifically for SWORD, but for retrieving other associated URIs
     private function get($sac_url, $sac_u, $sac_p, $sac_obo) {
