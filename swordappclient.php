@@ -143,9 +143,9 @@ class SWORDAPPClient {
     }
 
     // Function to create a resource by depositing an Atom entry
-    function depositAtomEntryString($sac_url, $sac_u, $sac_p, $sac_obo, $sac_string, $sac_inprogress = false) {
-        return $this->depositAtomEntryStringByMethod($sac_url, $sac_u, $sac_p, $sac_obo,
-                                               "POST", $sac_string, $sac_inprogress);
+    function depositEntryString($sac_url, $sac_u, $sac_p, $sac_obo, $sac_string, $sac_contenttype = 'application/atom+xml; type=entry', $sac_inprogress = false) {
+        return $this->depositEntryStringByMethod($sac_url, $sac_u, $sac_p, $sac_obo,
+                                               "POST", $sac_string, $sac_contenttype, $sac_inprogress);
     }
     
     // Complete an incomplete deposit by posting the In-Progress header of false to an SE-IRI
@@ -668,8 +668,8 @@ class SWORDAPPClient {
     }
 
     // Function to deposit an Atom entry
-    private function depositAtomEntryStringByMethod($sac_url, $sac_u, $sac_p, $sac_obo,
-                                              $sac_method, $sac_string, $sac_inprogress = false) {
+    private function depositEntryStringByMethod($sac_url, $sac_u, $sac_p, $sac_obo,
+                                              $sac_method, $sac_string, $sac_contenttype = 'application/atom+xml; type=entry', $sac_inprogress = false) {
         // Perform the deposit
         $sac_curl = $this->curl_init($sac_url, $sac_u, $sac_p);
 
@@ -679,7 +679,7 @@ class SWORDAPPClient {
         if (!empty($sac_obo)) {
             array_push($headers, "On-Behalf-Of: " . $sac_obo);
         }
-        array_push($headers, "Content-Type: application/atom+xml;type=entry");
+        array_push($headers, "Content-Type: " . $sac_contenttype);
         if ($sac_inprogress) {
             array_push($headers, "In-Progress: true");
         } else {
