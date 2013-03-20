@@ -23,7 +23,7 @@ class SWORDAPPClient {
         global $sal_useragent;
         array_push($headers, $sal_useragent);
         if (!empty($sac_obo)) {
-            array_push($headers, "X-On-Behalf-Of: " . $sac_obo);
+            array_push($headers, "On-Behalf-Of: " . $sac_obo);
         }
         curl_setopt($sac_curl, CURLOPT_HTTPHEADER, $headers);
         $sac_resp = curl_exec($sac_curl);
